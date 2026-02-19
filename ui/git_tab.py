@@ -1,7 +1,7 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
                                  QPushButton, QTextEdit, QLabel, QSplitter, QMessageBox, 
-                                 QGroupBox)
-from PySide6.QtCore import Qt, QTimer
+                                 QGroupBox, QListWidget)
+from PySide6.QtCore import Qt
 from models.git_manager import GitManager
 
 class GitTab(QWidget):
@@ -13,7 +13,8 @@ class GitTab(QWidget):
             self.manager = GitManager(repo_path)
             
         self._init_ui()
-        self._refresh_status()
+        if self.manager:
+            self._refresh_status()
 
     def set_repo_path(self, path):
         self.repo_path = path
@@ -28,6 +29,9 @@ class GitTab(QWidget):
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         
+        self.refresh_btn = QPushButton("Refresh Status")
+        self.refresh_btn.clicked.connect(self._refresh_status)
+        
         # Unstaged Files
         unstaged_group = QGroupBox("Unstaged Changes")
         u_layout = QVBoxLayout()
@@ -40,7 +44,7 @@ class GitTab(QWidget):
         unstaged_group.setLayout(u_layout)
 
         # Staged Files
-        staged_group = QGroupBox("Staged Changes (Ready to Commit)")
+        staged_group = QGroupBox("Staged Changes")
         s_layout = QVBoxLayout()
         self.staged_list = QListWidget()
         self.staged_list.itemClicked.connect(self._on_staged_select)
@@ -50,6 +54,7 @@ class GitTab(QWidget):
         s_layout.addWidget(self.unstage_btn)
         staged_group.setLayout(s_layout)
 
+        left_layout.addWidget(self.refresh_btn)
         left_layout.addWidget(unstaged_group)
         left_layout.addWidget(staged_group)
 
@@ -70,7 +75,7 @@ class GitTab(QWidget):
         btn_layout = QHBoxLayout()
         self.commit_btn = QPushButton("Commit")
         self.commit_btn.clicked.connect(self._commit)
-        self.push_btn = QPushButton("Push to Origin")
+        self.push_btn = QPushButton("Push")
         self.push_btn.clicked.connect(self._push)
         self.pull_btn = QPushButton("Pull")
         self.pull_btn.clicked.connect(self._pull)
@@ -92,18 +97,17 @@ class GitTab(QWidget):
         main_layout.addWidget(splitter)
         self.setLayout(main_layout)
 
-        # Timer to auto-refresh status periodically or after actions
-        self.refresh_btn = QPushButton("Refresh Status")
-        self.refresh_btn.clicked.connect(self._refresh_status)
-        left_layout.insertWidget(0, self.refresh_btn)
-
     def _refresh_status(self):
         if not self.manager: return
         self.unstaged_list.clear()
         self.staged_list.clear()
         
-        staged, unstaged = self.manager.get_status()
+        staged, unstaged, err = self.manager.get_status()
         
+        if err:
+            self.diff_view.setPlainText(f"Git Error:\n{err}\n\nCheck if the path is correct in Settings.")
+            return
+
         for item in unstaged:
             self.unstaged_list.addItem(f"{item['status']} {item['path']}")
         
@@ -139,16 +143,19 @@ class GitTab(QWidget):
         if not msg:
             QMessageBox.warning(self, "Error", "Commit message cannot be empty")
             return
-        self.manager.commit(msg)
-        self.commit_msg.clear()
+        out, err = self.manager.commit(msg)
+        if err:
+             QMessageBox.warning(self, "Commit Error", err)
+        else:
+             self.commit_msg.clear()
+             QMessageBox.information(self, "Success", "Committed successfully")
         self._refresh_status()
-        QMessageBox.information(self, "Success", "Committed successfully")
 
     def _push(self):
-        QMessageBox.information(self, "Pushing", "Pushing to remote... This might take a moment.")
+        QMessageBox.information(self, "Pushing", "Pushing to remote... check console if stuck.")
         out, err = self.manager.push()
         if err:
-            QMessageBox.warning(self, "Git Output", f"{out}\n{err}")
+            QMessageBox.warning(self, "Push Error", f"{out}\n{err}")
         else:
             QMessageBox.information(self, "Success", "Pushed successfully")
 

@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, 
-                                 QLineEdit, QTextEdit, QLabel, QFormLayout, QScrollArea, 
-                                 QPushButton, QListWidget, QInputDialog, QMessageBox, QGroupBox)
+                                 QLineEdit, QTextEdit, QLabel, QFormLayout, 
+                                 QPushButton, QListWidget, QMessageBox)
 from models.data_manager import DataManager
 
 class ProfileTab(QWidget):
@@ -50,9 +50,9 @@ class ProfileTab(QWidget):
         
         self._setup_hero()
         self._setup_about()
-        self._setup_experience() # Complex list
-        self._setup_projects()   # Complex list
-        self._setup_skills()     # Dictionary
+        self._setup_experience()
+        self._setup_projects()
+        self._setup_skills()
         
         layout.addWidget(self.tabs)
         self.setLayout(layout)
@@ -62,11 +62,13 @@ class ProfileTab(QWidget):
 
     def _setup_hero(self):
         layout = QFormLayout()
-        self.hero_name = QLineEdit()
+        self.hero_firstname = QLineEdit()
+        self.hero_lastname = QLineEdit()  # Added Last Name
         self.hero_subtitle = QLineEdit()
         self.hero_location = QLineEdit()
         
-        layout.addRow("First Name:", self.hero_name)
+        layout.addRow("First Name:", self.hero_firstname)
+        layout.addRow("Last Name:", self.hero_lastname)
         layout.addRow("Subtitle:", self.hero_subtitle)
         layout.addRow("Location:", self.hero_location)
         self.hero_tab.setLayout(layout)
@@ -91,7 +93,6 @@ class ProfileTab(QWidget):
         self.about_tab.setLayout(layout)
 
     def _setup_experience(self):
-        # Master-Detail view
         layout = QHBoxLayout()
         
         # List
@@ -104,8 +105,15 @@ class ProfileTab(QWidget):
         add_btn.clicked.connect(self._add_exp)
         del_btn = QPushButton("-")
         del_btn.clicked.connect(self._del_exp)
+        up_btn = QPushButton("Up")      # Added Up
+        up_btn.clicked.connect(self._move_exp_up)
+        down_btn = QPushButton("Down")  # Added Down
+        down_btn.clicked.connect(self._move_exp_down)
+        
         btn_layout.addWidget(add_btn)
         btn_layout.addWidget(del_btn)
+        btn_layout.addWidget(up_btn)
+        btn_layout.addWidget(down_btn)
         
         list_layout.addWidget(self.exp_list)
         list_layout.addLayout(btn_layout)
@@ -116,14 +124,13 @@ class ProfileTab(QWidget):
         self.exp_company = QLineEdit()
         self.exp_role = QLineEdit()
         self.exp_date = QLineEdit()
-        self.exp_highlights = QTextEdit() # Newline separated
+        self.exp_highlights = QTextEdit()
         
         form_layout.addRow("Company:", self.exp_company)
         form_layout.addRow("Role:", self.exp_role)
         form_layout.addRow("Date:", self.exp_date)
         form_layout.addRow("Highlights (one per line):", self.exp_highlights)
         
-        # Connect updates
         self.exp_company.textChanged.connect(self._update_exp_data)
         self.exp_role.textChanged.connect(self._update_exp_data)
         self.exp_date.textChanged.connect(self._update_exp_data)
@@ -149,8 +156,15 @@ class ProfileTab(QWidget):
         add_btn.clicked.connect(self._add_proj)
         del_btn = QPushButton("-")
         del_btn.clicked.connect(self._del_proj)
+        up_btn = QPushButton("Up")
+        up_btn.clicked.connect(self._move_proj_up)
+        down_btn = QPushButton("Down")
+        down_btn.clicked.connect(self._move_proj_down)
+        
         btn_layout.addWidget(add_btn)
         btn_layout.addWidget(del_btn)
+        btn_layout.addWidget(up_btn)
+        btn_layout.addWidget(down_btn)
         
         list_layout.addWidget(self.proj_list)
         list_layout.addLayout(btn_layout)
@@ -160,7 +174,7 @@ class ProfileTab(QWidget):
         form_layout = QFormLayout()
         self.proj_name = QLineEdit()
         self.proj_desc = QTextEdit()
-        self.proj_tech = QLineEdit() # Comma sep
+        self.proj_tech = QLineEdit()
         self.proj_link = QLineEdit()
         
         form_layout.addRow("Name:", self.proj_name)
@@ -181,8 +195,6 @@ class ProfileTab(QWidget):
         self.proj_tab.setLayout(layout)
 
     def _setup_skills(self):
-        # Plain text edit for JSON for now to ensure flexibility, or structured? 
-        # Structured: Category list -> Item list
         layout = QHBoxLayout()
         
         # Categories
@@ -209,7 +221,8 @@ class ProfileTab(QWidget):
         
         # Hero
         hero = self.data.get('hero', {})
-        self.hero_name.setText(hero.get('firstName', ''))
+        self.hero_firstname.setText(hero.get('firstName', ''))
+        self.hero_lastname.setText(hero.get('lastName', '')) # Populate Last Name
         self.hero_subtitle.setText(hero.get('subtitle', ''))
         self.hero_location.setText(hero.get('location', ''))
         
@@ -237,7 +250,38 @@ class ProfileTab(QWidget):
         for cat in skills.keys():
             self.skill_cats.addItem(cat)
 
-    # --- Event Handlers ---
+    # --- Reordering Logic ---
+    def _move_item(self, list_widget, data_list, direction):
+        row = list_widget.currentRow()
+        if row < 0: return
+        
+        new_row = row + direction
+        if 0 <= new_row < len(data_list):
+            # Swap in data
+            data_list[row], data_list[new_row] = data_list[new_row], data_list[row]
+            
+            # Swap in UI
+            item = list_widget.takeItem(row)
+            list_widget.insertItem(new_row, item)
+            list_widget.setCurrentRow(new_row)
+
+    def _move_exp_up(self):
+        if 'experience' in self.data:
+            self._move_item(self.exp_list, self.data['experience'], -1)
+
+    def _move_exp_down(self):
+        if 'experience' in self.data:
+            self._move_item(self.exp_list, self.data['experience'], 1)
+
+    def _move_proj_up(self):
+        if 'projects' in self.data:
+            self._move_item(self.proj_list, self.data['projects'], -1)
+
+    def _move_proj_down(self):
+        if 'projects' in self.data:
+            self._move_item(self.proj_list, self.data['projects'], 1)
+
+    # --- Selection Handlers ---
     def _on_exp_select(self, current, prev):
         if not current: 
             self.exp_form.setEnabled(False)
@@ -290,7 +334,6 @@ class ProfileTab(QWidget):
             self.data['experience'].pop(row)
             self.exp_list.takeItem(row)
 
-    # Projects Handlers (Simplified for brevity, similar logic)
     def _on_proj_select(self, current, prev):
         if not current: return
         self.proj_form.setEnabled(True)
@@ -342,7 +385,6 @@ class ProfileTab(QWidget):
             self.data['projects'].pop(row)
             self.proj_list.takeItem(row)
 
-    # Skills Handlers
     def _on_skill_cat_select(self, current, prev):
         if not current: return
         cat = current.text()
@@ -359,9 +401,9 @@ class ProfileTab(QWidget):
         self.data['skills'][cat] = skills
 
     def _save_data(self):
-        # Update Hero/About from fields before saving
         if 'hero' not in self.data: self.data['hero'] = {}
-        self.data['hero']['firstName'] = self.hero_name.text()
+        self.data['hero']['firstName'] = self.hero_firstname.text()
+        self.data['hero']['lastName'] = self.hero_lastname.text() # Save Last Name
         self.data['hero']['subtitle'] = self.hero_subtitle.text()
         self.data['hero']['location'] = self.hero_location.text()
         

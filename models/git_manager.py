@@ -5,9 +5,19 @@ class GitManager:
     def __init__(self, repo_path):
         self.repo_path = repo_path
 
+    def _check_repo(self):
+        if not self.repo_path or not os.path.exists(self.repo_path):
+            return False, "Repository path does not exist."
+        if not os.path.exists(os.path.join(self.repo_path, '.git')):
+            return False, "Directory is not a git repository."
+        return True, ""
+
     def run_git(self, args):
+        valid, msg = self._check_repo()
+        if not valid:
+            return "", msg
+
         try:
-            # Run git command in the repo directory
             result = subprocess.run(
                 ['git'] + args,
                 cwd=self.repo_path,
@@ -15,36 +25,41 @@ class GitManager:
                 text=True,
                 check=False
             )
-            return result.stdout.strip(), result.stderr.strip()
+            if result.returncode != 0:
+                # Return stderr as the error message if command failed
+                return result.stdout.strip(), result.stderr.strip()
+            return result.stdout.strip(), ""
+        except FileNotFoundError:
+            return "", "Git executable not found in PATH."
         except Exception as e:
             return "", str(e)
 
     def get_status(self):
-        # -z for machine readable output, --porcelain for stable format
-        stdout, _ = self.run_git(['status', '-z', '--porcelain'])
-        if not stdout:
-            return [], []
+        stdout, err = self.run_git(['status', '-z', '--porcelain'])
+        if err:
+            return [], [], err  # Return error
         
         staged = []
         unstaged = []
         
-        # Parse null-terminated strings
+        if not stdout:
+            return staged, unstaged, ""
+
         entries = stdout.split('\x00')
         for entry in entries:
             if not entry or len(entry) < 3: continue
             code = entry[:2]
             path = entry[3:]
             
-            # X = Index (staged), Y = Worktree (unstaged)
             x_code = code[0]
             y_code = code[1]
             
-            if x_code in 'MADRC': # Staged
+            if x_code in 'MADRC': 
                 staged.append({'path': path, 'status': x_code})
-            if y_code in 'MD?':   # Unstaged (Modified, Deleted, Untracked)
+            if y_code in 'MD?':   
                 unstaged.append({'path': path, 'status': y_code})
                 
-        return staged, unstaged
+        return staged, unstaged, ""
 
     def get_diff(self, filepath=None, staged=False):
         args = ['diff']
@@ -52,17 +67,18 @@ class GitManager:
             args.append('--cached')
         if filepath:
             args.append(filepath)
-        stdout, _ = self.run_git(args)
+        stdout, err = self.run_git(args)
+        if err: return f"Error getting diff: {err}"
         return stdout
 
     def stage_file(self, filepath):
-        self.run_git(['add', filepath])
+        return self.run_git(['add', filepath])
 
     def unstage_file(self, filepath):
-        self.run_git(['reset', 'HEAD', filepath])
+        return self.run_git(['reset', 'HEAD', filepath])
 
     def commit(self, message):
-        self.run_git(['commit', '-m', message])
+        return self.run_git(['commit', '-m', message])
 
     def push(self):
         return self.run_git(['push'])
