@@ -3,6 +3,7 @@ from ui.posts_tab import PostsTab
 from ui.git_tab import GitTab
 from ui.profile_tab import ProfileTab
 from utils.settings import SettingsManager
+from utils.theme import apply_dark_theme # Import theme
 import os
 
 class MainWindow(QMainWindow):
@@ -11,6 +12,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("shahil-sk.github.io CMS")
         self.resize(1200, 800)
         
+        # Apply Theme
+        apply_dark_theme(self.app_instance) 
+
         self.settings_manager = SettingsManager()
         self.repo_path = self.settings_manager.get_repo_path()
         

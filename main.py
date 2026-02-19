@@ -8,6 +8,7 @@ def main():
     app.setApplicationName("shahil-sk.github.io CMS")
     
     window = MainWindow()
+    window.app_instance = app # Pass app ref for theme
     window.show()
     
     sys.exit(app.exec())

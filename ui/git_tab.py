@@ -29,8 +29,14 @@ class GitTab(QWidget):
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         
+        # Test Connection Button
+        top_bar = QHBoxLayout()
         self.refresh_btn = QPushButton("Refresh Status")
         self.refresh_btn.clicked.connect(self._refresh_status)
+        self.test_btn = QPushButton("Test Connection")
+        self.test_btn.clicked.connect(self._test_connection)
+        top_bar.addWidget(self.refresh_btn)
+        top_bar.addWidget(self.test_btn)
         
         # Unstaged Files
         unstaged_group = QGroupBox("Unstaged Changes")
@@ -54,7 +60,7 @@ class GitTab(QWidget):
         s_layout.addWidget(self.unstage_btn)
         staged_group.setLayout(s_layout)
 
-        left_layout.addWidget(self.refresh_btn)
+        left_layout.addLayout(top_bar)
         left_layout.addWidget(unstaged_group)
         left_layout.addWidget(staged_group)
 
@@ -97,6 +103,16 @@ class GitTab(QWidget):
         main_layout.addWidget(splitter)
         self.setLayout(main_layout)
 
+    def _test_connection(self):
+        if not self.manager:
+             QMessageBox.warning(self, "Error", "No repo path set.")
+             return
+        ok, msg = self.manager.get_git_version()
+        if ok:
+             QMessageBox.information(self, "Git Found", f"Success! Found: {msg}")
+        else:
+             QMessageBox.critical(self, "Git Missing", f"Could not find git executable.\nError: {msg}")
+
     def _refresh_status(self):
         if not self.manager: return
         self.unstaged_list.clear()
@@ -105,7 +121,7 @@ class GitTab(QWidget):
         staged, unstaged, err = self.manager.get_status()
         
         if err:
-            self.diff_view.setPlainText(f"Git Error:\n{err}\n\nCheck if the path is correct in Settings.")
+            self.diff_view.setPlainText(f"Git Error:\n{err}\n\nPlease check Settings path and ensure it's a git repo.")
             return
 
         for item in unstaged:
