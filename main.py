@@ -7,8 +7,8 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("shahil-sk.github.io CMS")
     
-    window = MainWindow()
-    window.app_instance = app # Pass app ref for theme
+    # Pass app instance to MainWindow so it can set the theme
+    window = MainWindow(app)
     window.show()
     
     sys.exit(app.exec())
